@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Passwort ändern{% endblock %}
+
+{% block content %}
+<div class="page-sm" style="padding-left:0;padding-right:0;">
+  <div class="page-header">
+    <div class="page-title">Passwort ändern</div>
+  </div>
+  <div class="card">
+    <div class="card-body">
+      <form method="post">
+        <div class="form-group mb-1">
+          <label>Aktuelles Passwort</label>
+          <input type="password" name="alt" required>
+        </div>
+        <div class="form-group mb-1">
+          <label>Neues Passwort (mind. 6 Zeichen)</label>
+          <input type="password" name="neu" required>
+        </div>
+        <div class="form-group mb-2">
+          <label>Neues Passwort wiederholen</label>
+          <input type="password" name="neu2" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Passwort speichern</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

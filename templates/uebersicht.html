@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Übersicht{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Freigegebene Störungen</div>
+    <div class="page-sub">{{ stoerungen|length }} Einträge</div>
+  </div>
+  <div class="gap-row">
+    <a href="{{ url_for('export_csv') }}" class="btn btn-outline btn-sm">↓ CSV Export</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Nummer</th>
+          <th>Datum</th>
+          <th>Aufgabenbereich</th>
+          <th>Ort</th>
+          <th>Meldetext</th>
+          <th>Bereitschaftler</th>
+          <th>Art</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in stoerungen %}
+          <tr>
+            <td class="num">{{ s.nummer }}</td>
+            <td>{{ s.datum_beginn|datefmt }}</td>
+            <td class="bold">{{ s.aufgabenbereich }}</td>
+            <td>{{ s.spez_ort or '–' }}</td>
+            <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+              {{ s.meldetext }}</td>
+            <td>{{ s.ersteller }}</td>
+            <td>
+              {% if s.laptop_einsatz %}
+                <span class="pill pill-eingereicht">Laptop</span>
+              {% else %}
+                <span class="text-muted">Vor-Ort</span>
+              {% endif %}
+            </td>
+            <td><a href="{{ url_for('detail', sid=s.id) }}" class="btn btn-outline btn-sm">Detail</a></td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="8" style="text-align:center;padding:2rem;color:var(--text-light);">
+              Noch keine freigegebenen Störungsmeldungen vorhanden.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

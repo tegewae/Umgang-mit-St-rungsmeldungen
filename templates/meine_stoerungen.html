@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Meine Meldungen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Meine Störungsmeldungen</div>
+    <div class="page-sub">{{ current_user().name }}</div>
+  </div>
+  <a href="{{ url_for('neu') }}" class="btn btn-primary">+ Neue Störung</a>
+</div>
+
+{% if stoerungen %}
+  <div class="card">
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>Nummer</th>
+            <th>Datum</th>
+            <th>Aufgabenbereich</th>
+            <th>Meldetext</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in stoerungen %}
+            <tr>
+              <td class="num">{{ s.nummer }}</td>
+              <td>{{ s.datum_beginn|datefmt }}</td>
+              <td class="bold">{{ s.aufgabenbereich }}</td>
+              <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                {{ s.meldetext }}</td>
+              <td><span class="pill pill-{{ s.status }}">{{ s.status|statuslabel }}</span></td>
+              <td>
+                <div class="gap-row">
+                  {% if s.status in ('entwurf', 'abgelehnt') %}
+                    <a href="{{ url_for('bearbeiten', sid=s.id) }}" class="btn btn-outline btn-sm">Bearbeiten</a>
+                    {% if s.status == 'entwurf' %}
+                      <a href="{{ url_for('einreichen', sid=s.id) }}" class="btn btn-primary btn-sm">Einreichen</a>
+                    {% endif %}
+                  {% else %}
+                    <a href="{{ url_for('detail', sid=s.id) }}" class="btn btn-outline btn-sm">Ansehen</a>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% else %}
+  <div class="card">
+    <div class="card-body" style="text-align:center;padding:3rem;color:var(--text-light);">
+      <div style="font-size:2.5rem;margin-bottom:.8rem;">📋</div>
+      <div style="font-weight:600;margin-bottom:.3rem;">Noch keine Meldungen</div>
+      <div style="font-size:.85rem;">Legen Sie Ihre erste Störungsmeldung an.</div>
+      <a href="{{ url_for('neu') }}" class="btn btn-primary mt-2">+ Neue Störung erfassen</a>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

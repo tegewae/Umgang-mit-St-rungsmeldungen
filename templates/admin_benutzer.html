@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Benutzerverwaltung{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title">Benutzerverwaltung</div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 340px;gap:1rem;align-items:start;">
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">Aktive Benutzer</span></div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr><th>Name</th><th>Rolle</th><th>Status</th><th>Passwort</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+            <tr>
+              <td class="bold">{{ u.name }}</td>
+              <td>
+                <span class="pill
+                  {{ 'pill-freigegeben' if u.rolle=='meister' else
+                     'pill-eingereicht' if u.rolle=='tl' else
+                     'pill-entwurf' }}">
+                  {{ {'meister':'Meister','tl':'TL','bereitschaft':'Bereitschaft'}.get(u.rolle, u.rolle) }}
+                </span>
+              </td>
+              <td>
+                {% if u.aktiv %}
+                  <span style="color:var(--green);font-weight:600;font-size:.82rem;">Aktiv</span>
+                {% else %}
+                  <span style="color:var(--red);font-weight:600;font-size:.82rem;">Gesperrt</span>
+                {% endif %}
+              </td>
+              <td>
+                <form method="post" action="{{ url_for('admin_passwort', uid=u.id) }}"
+                      style="display:flex;gap:.4rem;">
+                  <input type="password" name="passwort" placeholder="Neues Passwort"
+                         style="width:140px;padding:.3rem .6rem;font-size:.8rem;">
+                  <button type="submit" class="btn btn-outline btn-sm">Setzen</button>
+                </form>
+              </td>
+              <td>
+                <a href="{{ url_for('admin_toggle', uid=u.id) }}" class="btn btn-outline btn-sm">
+                  {{ 'Sperren' if u.aktiv else 'Entsperren' }}
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">Neuen Benutzer anlegen</span></div>
+    <div class="card-body">
+      <form method="post" action="{{ url_for('admin_benutzer_neu') }}">
+        <div class="form-group mb-1">
+          <label>Benutzername <span class="req">*</span></label>
+          <input type="text" name="name" required placeholder="z.B. Müller">
+        </div>
+        <div class="form-group mb-1">
+          <label>Passwort <span class="req">*</span></label>
+          <input type="password" name="passwort" required placeholder="mind. 6 Zeichen">
+        </div>
+        <div class="form-group mb-2">
+          <label>Rolle <span class="req">*</span></label>
+          <select name="rolle" required>
+            <option value="bereitschaft">Bereitschaft</option>
+            <option value="meister">Meister</option>
+            <option value="tl">Technische Leitung</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;">Benutzer anlegen</button>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

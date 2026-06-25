@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Störungsmanagement{% endblock %} – AES</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<nav class="nav">
+  <a href="{{ url_for('index') }}" class="nav-brand">
+    <span class="brand-abbr">AES</span> Störungsmanagement
+  </a>
+
+  <div class="nav-links">
+    {% set rolle = current_user().rolle %}
+
+    {% if rolle == 'bereitschaft' %}
+      <a href="{{ url_for('meine_stoerungen') }}"
+         class="{{ 'active' if request.endpoint == 'meine_stoerungen' }}">Meine Meldungen</a>
+      <a href="{{ url_for('neu') }}"
+         class="{{ 'active' if request.endpoint == 'neu' }}">+ Neue Störung</a>
+    {% endif %}
+
+    {% if rolle in ('meister','tl') %}
+      <a href="{{ url_for('posteingang') }}"
+         class="{{ 'active' if request.endpoint == 'posteingang' }}">
+        Posteingang
+        {% if pending_count > 0 %}<span class="nav-badge">{{ pending_count }}</span>{% endif %}
+      </a>
+      <a href="{{ url_for('uebersicht') }}"
+         class="{{ 'active' if request.endpoint == 'uebersicht' }}">Übersicht</a>
+    {% endif %}
+
+    <a href="{{ url_for('dashboard') }}"
+       class="{{ 'active' if request.endpoint == 'dashboard' }}">Dashboard</a>
+
+    {% if rolle == 'meister' %}
+      <a href="{{ url_for('admin_benutzer') }}"
+         class="{{ 'active' if request.endpoint == 'admin_benutzer' }}">Benutzer</a>
+    {% endif %}
+  </div>
+
+  <div class="nav-user">
+    <span>{{ current_user().name }}
+      <span style="font-size:.7rem;opacity:.6;margin-left:.2rem;">
+        {{ {'bereitschaft':'Bereitschaft','meister':'Meister','tl':'TL'}.get(current_user().rolle, '') }}
+      </span>
+    </span>
+    <a href="{{ url_for('passwort_aendern') }}">Passwort</a>
+    <a href="{{ url_for('logout') }}">Abmelden</a>
+  </div>
+</nav>
+
+<div class="{% block container_class %}page{% endblock %}">
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="alerts">
+        {% for cat, msg in messages %}
+          <div class="alert alert-{{ cat }}">{{ msg }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</div>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

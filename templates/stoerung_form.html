@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Störung bearbeiten' if stoerung else 'Neue Störung' }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">{{ 'Störung ' + stoerung.nummer if stoerung else 'Neue Störung erfassen' }}</div>
+    {% if stoerung %}
+      <div class="page-sub">Status:
+        <span class="pill pill-{{ stoerung.status }}">{{ stoerung.status|statuslabel }}</span>
+      </div>
+    {% endif %}
+  </div>
+  <a href="{{ url_for('meine_stoerungen') }}" class="btn btn-outline btn-sm">← Zurück</a>
+</div>
+
+{% if stoerung and stoerung.status == 'abgelehnt' %}
+  <div class="callout red mb-2">
+    <strong>Meldung wurde abgelehnt</strong>
+    Bitte korrigieren Sie die Meldung anhand des Meister-Kommentars und reichen Sie sie erneut ein.
+  </div>
+{% endif %}
+
+<form method="post">
+  <div class="card mb-2">
+    <div class="card-header"><span class="card-title">Störungsdaten</span></div>
+    <div class="card-body">
+      <div class="form-grid">
+
+        <div class="form-group">
+          <label>Aufgabenbereich <span class="req">*</span></label>
+          <select name="aufgabenbereich" required>
+            <option value="">– Bitte wählen –</option>
+            {% set bereiche = [
+              'Klärwerk','BB1-5','BB4-5','NKB','UeSS','Faulung',
+              'Kanalnetz','Pumpwerk','Online-Messung','Maschinentechnik',
+              'E-Technik','Gebäude','Sonstiges'
+            ] %}
+            {% for b in bereiche %}
+              <option value="{{ b }}"
+                {{ 'selected' if stoerung and stoerung.aufgabenbereich == b }}>{{ b }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Spezifischer Ort</label>
+          <input type="text" name="spez_ort"
+                 value="{{ stoerung.spez_ort if stoerung else '' }}"
+                 placeholder="z.B. NKB II, FB 2, PW 51 Wetternstr.">
+        </div>
+
+        <div class="form-group">
+          <label>Bereichstyp</label>
+          <select name="bereich_typ">
+            {% for t in ['Klärwerk','Kanalnetz','Harz-Energie','Sonstiges'] %}
+              <option value="{{ t }}"
+                {{ 'selected' if stoerung and stoerung.bereich_typ == t }}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Datum der Störung <span class="req">*</span></label>
+          <input type="date" name="datum_beginn" required
+                 value="{{ stoerung.datum_beginn if stoerung else '' }}">
+        </div>
+
+        <div class="form-group">
+          <label>Uhrzeit Einsatzbeginn</label>
+          <input type="time" name="uhrzeit_beginn"
+                 value="{{ stoerung.uhrzeit_beginn if stoerung else '' }}">
+        </div>
+
+        <div class="form-group">
+          <label>Uhrzeit Einsatzende</label>
+          <input type="time" name="uhrzeit_ende"
+                 value="{{ stoerung.uhrzeit_ende if stoerung else '' }}">
+        </div>
+
+        <div class="form-group full">
+          <label>Meldetext / Störungsbeschreibung <span class="req">*</span></label>
+          <textarea name="meldetext" required rows="3"
+                    placeholder="Was wurde gemeldet? Welche Anlage ist betroffen?">{{ stoerung.meldetext if stoerung else '' }}</textarea>
+        </div>
+
+        <div class="form-group full">
+          <label>Ursache der Störung</label>
+          <textarea name="ursache" rows="2"
+                    placeholder="Festgestellte oder vermutete Ursache">{{ stoerung.ursache if stoerung else '' }}</textarea>
+        </div>
+
+        <div class="form-group full">
+          <label>Ergriffene Maßnahmen</label>
+          <textarea name="massnahmen" rows="3"
+                    placeholder="Welche Maßnahmen wurden ergriffen? Wurde die Störung behoben?">{{ stoerung.massnahmen if stoerung else '' }}</textarea>
+        </div>
+
+        <div class="form-group full">
+          <label>Bemerkungen</label>
+          <textarea name="bemerkungen" rows="2"
+                    placeholder="Weitere Hinweise, Folgeaufgaben, endgültige Beseitigung vorgesehen am ...">{{ stoerung.bemerkungen if stoerung else '' }}</textarea>
+        </div>
+
+        <div class="form-group full">
+          <div class="checkbox-row">
+            <input type="checkbox" id="laptop" name="laptop_einsatz" value="1"
+                   {{ 'checked' if stoerung and stoerung.laptop_einsatz }}>
+            <label for="laptop">Laptop-Einsatz (Remote-Bearbeitung)</label>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="card-footer">
+      <button type="submit" name="aktion" value="speichern" class="btn btn-outline">
+        Als Entwurf speichern
+      </button>
+      <button type="submit" name="aktion" value="einreichen" class="btn btn-primary">
+        Einreichen → Meister
+      </button>
+    </div>
+  </div>
+</form>
+
+{% if log %}
+  <div class="card mt-2">
+    <div class="card-header"><span class="card-title">Verlauf</span></div>
+    <div class="card-body">
+      <div class="log-list">
+        {% for e in log %}
+          <div class="log-item">
+            <div class="log-time">{{ e.zeitstempel[:16] }}</div>
+            <div class="log-body">
+              <strong>{{ e.name }}</strong> – {{ e.aktion|capitalize }}
+              {% if e.kommentar %}<br><em>{{ e.kommentar }}</em>{% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

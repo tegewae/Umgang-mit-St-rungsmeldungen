@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}{{ s.nummer }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">{{ s.nummer }}</div>
+    <div class="page-sub">
+      <span class="pill pill-{{ s.status }}">{{ s.status|statuslabel }}</span>
+      &nbsp; Erstellt von {{ s.ersteller }} am {{ s.erstellt_am[:10]|datefmt }}
+    </div>
+  </div>
+  <a href="javascript:history.back()" class="btn btn-outline btn-sm">← Zurück</a>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 300px;gap:1rem;align-items:start;">
+
+  <div>
+    <div class="card mb-1">
+      <div class="card-header"><span class="card-title">Störungsdaten</span></div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Aufgabenbereich</label>
+            <input type="text" value="{{ s.aufgabenbereich }}" readonly>
+          </div>
+          <div class="form-group">
+            <label>Spezifischer Ort</label>
+            <input type="text" value="{{ s.spez_ort or '–' }}" readonly>
+          </div>
+          <div class="form-group">
+            <label>Datum</label>
+            <input type="text" value="{{ s.datum_beginn|datefmt }}" readonly>
+          </div>
+          <div class="form-group">
+            <label>Einsatz</label>
+            <input type="text"
+              value="{{ s.uhrzeit_beginn or '–' }} bis {{ s.uhrzeit_ende or '–' }} · {{ 'Laptop' if s.laptop_einsatz else 'Vor Ort' }}"
+              readonly>
+          </div>
+          <div class="form-group full">
+            <label>Meldetext</label>
+            <textarea readonly rows="3">{{ s.meldetext }}</textarea>
+          </div>
+          <div class="form-group full">
+            <label>Ursache</label>
+            <textarea readonly rows="2">{{ s.ursache or '–' }}</textarea>
+          </div>
+          <div class="form-group full">
+            <label>Maßnahmen</label>
+            <textarea readonly rows="3">{{ s.massnahmen or '–' }}</textarea>
+          </div>
+          <div class="form-group full">
+            <label>Bemerkungen</label>
+            <textarea readonly rows="2">{{ s.bemerkungen or '–' }}</textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if log %}
+      <div class="card">
+        <div class="card-header"><span class="card-title">Freigabe-Verlauf</span></div>
+        <div class="card-body">
+          <div class="log-list">
+            {% for e in log %}
+              <div class="log-item">
+                <div class="log-time">{{ e.zeitstempel[:16] }}</div>
+                <div class="log-body">
+                  <strong>{{ e.name }}</strong> – {{ e.aktion|capitalize }}
+                  {% if e.kommentar %}<br><em style="color:var(--red-text,#b03030);">{{ e.kommentar }}</em>{% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <div>
+    {% if kosten %}
+      <div class="card mb-1">
+        <div class="card-header"><span class="card-title">Kostenzuordnung</span></div>
+        <div class="card-body">
+          <div class="form-group mb-1">
+            <label>Verursacher</label>
+            <input type="text" value="{{ kosten.verursacher or '–' }}" readonly>
+          </div>
+          <div class="form-group mb-1">
+            <label>Kostenträger</label>
+            <input type="text" value="{{ kosten.kostentraeger or '–' }}" readonly>
+          </div>
+          <div class="form-group mb-1">
+            <label>Auftragsnummer</label>
+            <input type="text" value="{{ kosten.auftragsnummer or '–' }}" readonly>
+          </div>
+          <div class="form-group">
+            <label>Weiterberechnung</label>
+            <input type="text" value="{{ 'Ja' if kosten.weiterberechnung else 'Nein' }}" readonly>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Metadaten</span></div>
+      <div class="card-body">
+        <div class="form-group mb-1">
+          <label>Störungsnummer</label>
+          <input type="text" value="{{ s.nummer }}" readonly
+                 style="font-family:var(--mono);font-size:.88rem;">
+        </div>
+        <div class="form-group mb-1">
+          <label>Bereichstyp</label>
+          <input type="text" value="{{ s.bereich_typ or '–' }}" readonly>
+        </div>
+        <div class="form-group mb-1">
+          <label>Angelegt am</label>
+          <input type="text" value="{{ s.erstellt_am[:16] }}" readonly>
+        </div>
+        {% if s.geaendert_am %}
+          <div class="form-group">
+            <label>Zuletzt geändert</label>
+            <input type="text" value="{{ s.geaendert_am[:16] }}" readonly>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

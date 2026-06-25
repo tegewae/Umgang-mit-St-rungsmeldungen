@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Dashboard {{ jahr }}{% endblock %}
+
+{% block head %}
+<script src="{{ url_for('static', filename='charts.js') }}"></script>
+{% endblock %}
+
+{% block container_class %}page{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Dashboard Störungsauswertung</div>
+    <div class="page-sub">Nur freigegebene Meldungen · Jahr {{ jahr }}</div>
+  </div>
+  <div class="gap-row">
+    <form method="get" style="display:flex;gap:.5rem;align-items:center;">
+      <select name="jahr" onchange="this.form.submit()"
+              style="padding:.4rem .7rem;font-size:.83rem;border:1px solid var(--rule);border-radius:5px;">
+        {% for j in jahre %}
+          <option value="{{ j.j }}" {{ 'selected' if j.j == jahr }}>{{ j.j }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% if current_user().rolle in ('meister','tl') %}
+      <a href="{{ url_for('export_csv', jahr=jahr) }}" class="btn btn-outline btn-sm">↓ CSV</a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- KPIs -->
+<div class="kpi-row">
+  <div class="kpi">
+    <div class="kpi-label">Gesamt {{ jahr }}</div>
+    <div class="kpi-value">{{ gesamt }}</div>
+    <div class="kpi-sub">freigegebene Meldungen</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Laptop-Einsätze</div>
+    <div class="kpi-value">{{ laptop }}</div>
+    <div class="kpi-sub">
+      {{ '%.0f'|format(laptop/gesamt*100 if gesamt else 0) }} % aller Einsätze
+    </div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Vor-Ort-Einsätze</div>
+    <div class="kpi-value">{{ vor_ort }}</div>
+    <div class="kpi-sub">
+      {{ '%.0f'|format(vor_ort/gesamt*100 if gesamt else 0) }} % aller Einsätze
+    </div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Ø Meldungen / Monat</div>
+    <div class="kpi-value">{{ '%.1f'|format(gesamt/12) }}</div>
+    <div class="kpi-sub">Jahresdurchschnitt</div>
+  </div>
+</div>
+
+<!-- Charts row 1 -->
+<div class="chart-grid">
+  <div class="chart-box wide">
+    <div class="chart-box-title">Einsätze pro Monat</div>
+    <canvas id="chartMonat" style="width:100%;height:180px;display:block;"></canvas>
+  </div>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-box">
+    <div class="chart-box-title">Einsatzart-Verteilung</div>
+    <canvas id="chartArt" style="width:100%;height:260px;display:block;"></canvas>
+  </div>
+  <div class="chart-box">
+    <div class="chart-box-title">Top Aufgabenbereiche</div>
+    <canvas id="chartBereich" style="width:100%;height:260px;display:block;"></canvas>
+  </div>
+</div>
+
+<!-- Ranking -->
+{% if top_meldungen %}
+  <div class="card mb-2">
+    <div class="card-header"><span class="card-title">Störungs-Ranking – häufigste Meldungen</span></div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr><th>#</th><th>Meldetext (Kurzform)</th><th style="text-align:right;">Anzahl</th></tr>
+        </thead>
+        <tbody>
+          {% for text, count in top_meldungen %}
+            <tr>
+              <td style="font-variant-numeric:tabular-nums;width:2rem;">{{ loop.index }}</td>
+              <td>{{ text }}</td>
+              <td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">{{ count }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
+
+{% if not gesamt %}
+  <div class="callout" style="margin-top:1rem;">
+    <strong>Keine Daten für {{ jahr }}</strong>
+    Das Dashboard zeigt ausschließlich durch den Meister freigegebene Störungsmeldungen.
+    Für {{ jahr }} liegen noch keine freigegebenen Meldungen vor.
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.addEventListener('load', function() {
+  barChart('chartMonat',
+    ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'],
+    [{{ monate['01'] }},{{ monate['02'] }},{{ monate['03'] }},{{ monate['04'] }},
+     {{ monate['05'] }},{{ monate['06'] }},{{ monate['07'] }},{{ monate['08'] }},
+     {{ monate['09'] }},{{ monate['10'] }},{{ monate['11'] }},{{ monate['12'] }}]
+  );
+
+  donutChart('chartArt',
+    ['Laptop-Einsatz','Vor-Ort-Einsatz'],
+    [{{ laptop }}, {{ vor_ort }}],
+    ['#5B9BD5','#2E5277']
+  );
+
+  hBarChart('chartBereich',
+    [{% for b, c in top_bereiche %}'{{ b|e }}',{% endfor %}],
+    [{% for b, c in top_bereiche %}{{ c }},{% endfor %}]
+  );
+});
+</script>
+{% endblock %}

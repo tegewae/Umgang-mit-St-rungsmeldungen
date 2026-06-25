@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Posteingang{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Posteingang – ausstehende Freigaben</div>
+    <div class="page-sub">
+      {% if stoerungen %}
+        {{ stoerungen|length }} Meldung{{ 'en' if stoerungen|length != 1 }} warten auf Prüfung
+      {% else %}
+        Keine ausstehenden Meldungen
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if stoerungen %}
+  <div class="card">
+    {% for s in stoerungen %}
+      <div class="inbox-item">
+        <div>
+          <div class="inbox-num">{{ s.nummer }}</div>
+          <div class="inbox-text">{{ s.meldetext[:80] }}{{ '…' if s.meldetext|length > 80 }}</div>
+          <div class="inbox-meta">
+            {{ s.datum_beginn|datefmt }}
+            {% if s.uhrzeit_beginn %}&nbsp;{{ s.uhrzeit_beginn }}{% endif %}
+            &nbsp;·&nbsp; {{ s.aufgabenbereich }}
+            {% if s.spez_ort %} – {{ s.spez_ort }}{% endif %}
+            &nbsp;·&nbsp; von <strong>{{ s.ersteller }}</strong>
+            {% if s.laptop_einsatz %}
+              &nbsp;·&nbsp; <span class="pill pill-eingereicht" style="font-size:.65rem;">Laptop</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="inbox-actions">
+          {% if current_user().rolle == 'meister' %}
+            <a href="{{ url_for('freigeben', sid=s.id) }}" class="btn btn-primary btn-sm">Prüfen</a>
+          {% else %}
+            <a href="{{ url_for('detail', sid=s.id) }}" class="btn btn-outline btn-sm">Ansehen</a>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card">
+    <div class="card-body" style="text-align:center;padding:3rem;color:var(--text-light);">
+      <div style="font-size:2.5rem;margin-bottom:.8rem;">✅</div>
+      <div style="font-weight:600;">Posteingang leer</div>
+      <div style="font-size:.85rem;margin-top:.3rem;">Alle eingereichten Meldungen wurden bearbeitet.</div>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
