@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Benutzer bearbeiten – {{ user.anzeigename or user.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">{{ user.anzeigename or user.name }}</div>
+    <div class="page-sub">
+      <span class="pill
+        {{ 'pill-freigegeben' if user.rolle=='meister'
+           else 'pill-eingereicht' if user.rolle=='tl'
+           else 'pill-entwurf' }}">
+        {{ ROLLE_LABELS.get(user.rolle, user.rolle) }}
+      </span>
+      &nbsp;
+      {% if user.aktiv %}
+        <span style="color:var(--green);font-size:.8rem;font-weight:600;">● Aktiv</span>
+      {% else %}
+        <span style="color:var(--red);font-size:.8rem;font-weight:600;">● Gesperrt</span>
+      {% endif %}
+    </div>
+  </div>
+  <a href="{{ url_for('admin_benutzer') }}" class="btn btn-outline btn-sm">← Zurück</a>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start;">
+
+  <!-- Stammdaten -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">Stammdaten</span></div>
+    <div class="card-body">
+      <form method="post">
+        <div class="form-group mb-1">
+          <label>Benutzername (Login)</label>
+          <input type="text" value="{{ user.name }}" readonly>
+        </div>
+        <div class="form-group mb-1">
+          <label>Anzeigename</label>
+          <input type="text" name="anzeigename"
+                 value="{{ user.anzeigename or '' }}"
+                 placeholder="Vollständiger Name">
+        </div>
+        <div class="form-group mb-2">
+          <label>Rolle</label>
+          <select name="rolle">
+            <option value="bereitschaft"
+              {{ 'selected' if user.rolle=='bereitschaft' }}>🔧 Bereitschaft</option>
+            <option value="meister"
+              {{ 'selected' if user.rolle=='meister' }}>🔑 Meister</option>
+            {% if current_user().rolle == 'admin' %}
+              <option value="tl"
+                {{ 'selected' if user.rolle=='tl' }}>👁 Technische Leitung</option>
+            {% endif %}
+          </select>
+        </div>
+        <button type="submit" name="aktion" value="speichern" class="btn btn-primary">
+          Änderungen speichern
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Passwort + Status + Löschen -->
+  <div style="display:flex;flex-direction:column;gap:1rem;">
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Passwort zurücksetzen</span></div>
+      <div class="card-body">
+        <form method="post">
+          <div class="form-group mb-1">
+            <label>Neues Passwort</label>
+            <input type="password" name="passwort_neu" required
+                   placeholder="mind. 6 Zeichen" autocomplete="new-password">
+          </div>
+          <div class="form-group mb-2">
+            <label>Wiederholen</label>
+            <input type="password" name="passwort_neu2" required
+                   autocomplete="new-password">
+          </div>
+          <button type="submit" name="aktion" value="passwort"
+                  class="btn btn-amber" style="width:100%;">
+            Passwort setzen
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Kontostatus</span></div>
+      <div class="card-body">
+        <div style="margin-bottom:.8rem;font-size:.85rem;color:var(--text-mid);">
+          {% if user.aktiv %}
+            Konto ist aktiv. Benutzer kann sich einloggen.
+          {% else %}
+            Konto ist gesperrt. Benutzer kann sich nicht einloggen.
+          {% endif %}
+        </div>
+        {% if user.letzter_login %}
+          <div style="font-size:.78rem;color:var(--text-light);margin-bottom:.8rem;">
+            Letzter Login: {{ user.letzter_login[:16] }}
+          </div>
+        {% endif %}
+        <div style="font-size:.78rem;color:var(--text-light);margin-bottom:.8rem;">
+          Störungsmeldungen: <strong>{{ stoer_count }}</strong>
+        </div>
+        <form method="post" style="display:flex;gap:.5rem;">
+          <button type="submit" name="aktion" value="toggle"
+                  class="btn btn-sm {{ 'btn-danger' if user.aktiv else 'btn-success' }}"
+                  style="flex:1"
+                  onclick="return confirm('{{ 'Konto sperren?' if user.aktiv else 'Konto entsperren?' }}')">
+            {{ 'Konto sperren' if user.aktiv else 'Konto entsperren' }}
+          </button>
+          {% if stoer_count == 0 %}
+            <button type="submit" name="aktion" value="loeschen"
+                    class="btn btn-sm btn-danger" style="flex:1"
+                    onclick="return confirm('Benutzer endgültig löschen?')">
+              Löschen
+            </button>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

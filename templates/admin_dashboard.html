@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Administration{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Administration</div>
+    <div class="page-sub">Systemübersicht &amp; Benutzerverwaltung</div>
+  </div>
+</div>
+
+<!-- KPI-Kacheln -->
+<div class="kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));">
+  <div class="kpi">
+    <div class="kpi-label">Benutzer aktiv</div>
+    <div class="kpi-value">{{ active_users }}</div>
+    <div class="kpi-sub">von {{ total_users }} gesamt</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Störungen gesamt</div>
+    <div class="kpi-value">{{ total_stoer }}</div>
+    <div class="kpi-sub">alle Jahre</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Im Posteingang</div>
+    <div class="kpi-value" style="{{ 'color:var(--amber)' if pending else '' }}">{{ pending }}</div>
+    <div class="kpi-sub">warten auf Meister</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Freigegeben</div>
+    <div class="kpi-value" style="color:var(--green)">{{ freigegeben }}</div>
+    <div class="kpi-sub">im Dashboard</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start;">
+
+  <!-- Rollen-Übersicht -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Benutzer nach Rolle</span>
+      <a href="{{ url_for('admin_benutzer') }}" class="btn btn-primary btn-sm">Alle verwalten</a>
+    </div>
+    <div class="card-body" style="padding:0;">
+      {% for r in by_rolle %}
+        <div style="display:flex;align-items:center;justify-content:space-between;
+                    padding:.85rem 1.2rem;border-bottom:1px solid var(--rule);">
+          <div style="display:flex;align-items:center;gap:.75rem;">
+            <div style="width:36px;height:36px;border-radius:50%;display:flex;
+                        align-items:center;justify-content:center;font-size:1.1rem;
+                        background:{{ {'meister':'#D6E8F7','tl':'#DFF0E6','bereitschaft':'#E8EDF2'}.get(r.rolle,'#eee') }};">
+              {{ {'meister':'🔑','tl':'👁','bereitschaft':'🔧'}.get(r.rolle,'👤') }}
+            </div>
+            <div>
+              <div style="font-weight:700;font-size:.88rem;color:var(--navy);">
+                {{ ROLLE_LABELS.get(r.rolle, r.rolle) }}
+              </div>
+              <div style="font-size:.75rem;color:var(--text-light);">
+                {{ r.aktiv }} aktiv{% if r.c - r.aktiv > 0 %}, {{ r.c - r.aktiv }} gesperrt{% endif %}
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:.5rem;">
+            <span style="font-size:1.5rem;font-weight:800;color:var(--navy);
+                         font-variant-numeric:tabular-nums;">{{ r.c }}</span>
+            <a href="{{ url_for('admin_benutzer', rolle=r.rolle) }}"
+               class="btn btn-outline btn-sm">Anzeigen</a>
+          </div>
+        </div>
+      {% else %}
+        <div style="padding:2rem;text-align:center;color:var(--text-light);">
+          Noch keine Benutzer angelegt.
+        </div>
+      {% endfor %}
+    </div>
+    <div class="card-footer">
+      <a href="{{ url_for('admin_benutzer') }}?new=1" class="btn btn-primary btn-sm">
+        + Neuen Benutzer anlegen
+      </a>
+    </div>
+  </div>
+
+  <!-- Letzte Aktivitäten -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">Letzte Aktivitäten</span></div>
+    <div style="max-height:380px;overflow-y:auto;">
+      {% for e in recent %}
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:.5rem .9rem;
+                    padding:.7rem 1.2rem;border-bottom:1px solid var(--rule);
+                    align-items:start;">
+          <div style="margin-top:.1rem;">
+            {% if e.aktion == 'freigegeben' %}
+              <span style="color:var(--green);font-size:.9rem;">✓</span>
+            {% elif e.aktion == 'abgelehnt' %}
+              <span style="color:var(--red);font-size:.9rem;">✗</span>
+            {% else %}
+              <span style="color:var(--cornflower);font-size:.9rem;">↑</span>
+            {% endif %}
+          </div>
+          <div>
+            <div style="font-size:.83rem;color:var(--text);">
+              <strong>{{ e.von_name }}</strong>
+              <span style="color:var(--text-light);"> – {{ e.aktion }}</span>
+              <span style="font-family:var(--mono);font-size:.75rem;color:var(--steel);
+                           margin-left:.4rem;">{{ e.nummer }}</span>
+            </div>
+            <div style="font-size:.75rem;color:var(--text-light);
+                        font-variant-numeric:tabular-nums;">
+              {{ e.zeitstempel[:16] }}
+            </div>
+            {% if e.kommentar %}
+              <div style="font-size:.77rem;color:var(--red);font-style:italic;margin-top:.1rem;">
+                {{ e.kommentar[:60] }}{% if e.kommentar|length > 60 %}…{% endif %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% else %}
+        <div style="padding:2rem;text-align:center;color:var(--text-light);">
+          Noch keine Aktivitäten.
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+
+<!-- Schnellzugriff -->
+<div style="margin-top:1rem;">
+  <div class="card-title" style="margin-bottom:.7rem;font-size:.72rem;letter-spacing:.1em;
+       text-transform:uppercase;color:var(--text-light);">Schnellzugriff</div>
+  <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+    <a href="{{ url_for('admin_benutzer', rolle='meister') }}" class="btn btn-outline">
+      🔑 Meister verwalten
+    </a>
+    <a href="{{ url_for('admin_benutzer', rolle='tl') }}" class="btn btn-outline">
+      👁 TL verwalten
+    </a>
+    <a href="{{ url_for('admin_benutzer', rolle='bereitschaft') }}" class="btn btn-outline">
+      🔧 Bereitschaftler verwalten
+    </a>
+    <a href="{{ url_for('uebersicht') }}" class="btn btn-outline">
+      📋 Störungsübersicht
+    </a>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-outline">
+      📊 Dashboard
+    </a>
+  </div>
+</div>
+{% endblock %}

@@ -17,11 +17,28 @@
   <div class="nav-links">
     {% set rolle = current_user().rolle %}
 
+    {% if rolle == 'admin' %}
+      <a href="{{ url_for('admin_dashboard') }}"
+         class="{{ 'active' if request.endpoint == 'admin_dashboard' }}">
+        Übersicht
+      </a>
+      <a href="{{ url_for('admin_benutzer') }}"
+         class="{{ 'active' if request.endpoint in ('admin_benutzer','admin_benutzer_edit') }}">
+        Benutzer
+      </a>
+      <a href="{{ url_for('uebersicht') }}"
+         class="{{ 'active' if request.endpoint == 'uebersicht' }}">Störungen</a>
+      <a href="{{ url_for('dashboard') }}"
+         class="{{ 'active' if request.endpoint == 'dashboard' }}">Dashboard</a>
+    {% endif %}
+
     {% if rolle == 'bereitschaft' %}
       <a href="{{ url_for('meine_stoerungen') }}"
          class="{{ 'active' if request.endpoint == 'meine_stoerungen' }}">Meine Meldungen</a>
       <a href="{{ url_for('neu') }}"
          class="{{ 'active' if request.endpoint == 'neu' }}">+ Neue Störung</a>
+      <a href="{{ url_for('dashboard') }}"
+         class="{{ 'active' if request.endpoint == 'dashboard' }}">Dashboard</a>
     {% endif %}
 
     {% if rolle in ('meister','tl') %}
@@ -32,14 +49,15 @@
       </a>
       <a href="{{ url_for('uebersicht') }}"
          class="{{ 'active' if request.endpoint == 'uebersicht' }}">Übersicht</a>
+      <a href="{{ url_for('dashboard') }}"
+         class="{{ 'active' if request.endpoint == 'dashboard' }}">Dashboard</a>
     {% endif %}
-
-    <a href="{{ url_for('dashboard') }}"
-       class="{{ 'active' if request.endpoint == 'dashboard' }}">Dashboard</a>
 
     {% if rolle == 'meister' %}
       <a href="{{ url_for('admin_benutzer') }}"
-         class="{{ 'active' if request.endpoint == 'admin_benutzer' }}">Benutzer</a>
+         class="{{ 'active' if request.endpoint in ('admin_benutzer','admin_benutzer_edit') }}">
+        Benutzer
+      </a>
     {% endif %}
   </div>
 

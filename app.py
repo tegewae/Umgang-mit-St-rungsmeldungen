@@ -35,11 +35,13 @@ def init_db():
     db = get_db()
     db.executescript("""
         CREATE TABLE IF NOT EXISTS benutzer (
-            id        INTEGER PRIMARY KEY AUTOINCREMENT,
-            name      TEXT    NOT NULL UNIQUE,
-            passwort  TEXT    NOT NULL,
-            rolle     TEXT    NOT NULL CHECK(rolle IN ('bereitschaft','meister','tl')),
-            aktiv     INTEGER NOT NULL DEFAULT 1
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT    NOT NULL UNIQUE,
+            anzeigename TEXT,
+            passwort    TEXT    NOT NULL,
+            rolle       TEXT    NOT NULL CHECK(rolle IN ('admin','bereitschaft','meister','tl')),
+            aktiv       INTEGER NOT NULL DEFAULT 1,
+            letzter_login TEXT
         );
 
         CREATE TABLE IF NOT EXISTS stoerung (
@@ -109,10 +111,45 @@ def init_db():
             pass
     db.commit()
 
+    # Migrate benutzer table: add columns + widen CHECK to include 'admin'
+    cols = {r[1] for r in db.execute("PRAGMA table_info(benutzer)").fetchall()}
+    if "anzeigename" not in cols:
+        db.execute("ALTER TABLE benutzer ADD COLUMN anzeigename TEXT")
+    if "letzter_login" not in cols:
+        db.execute("ALTER TABLE benutzer ADD COLUMN letzter_login TEXT")
+    # Recreate table if CHECK constraint doesn't include 'admin'
+    schema = db.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='benutzer'"
+    ).fetchone()
+    if schema and "'admin'" not in schema[0]:
+        # Old CHECK still active – recreate table
+        db.executescript("""
+            PRAGMA foreign_keys=OFF;
+            CREATE TABLE benutzer_new (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                name        TEXT    NOT NULL UNIQUE,
+                anzeigename TEXT,
+                passwort    TEXT    NOT NULL,
+                rolle       TEXT    NOT NULL
+                            CHECK(rolle IN ('admin','bereitschaft','meister','tl')),
+                aktiv       INTEGER NOT NULL DEFAULT 1,
+                letzter_login TEXT
+            );
+            INSERT INTO benutzer_new(id,name,anzeigename,passwort,rolle,aktiv,letzter_login)
+              SELECT id,name,anzeigename,passwort,rolle,aktiv,letzter_login FROM benutzer;
+            DROP TABLE benutzer;
+            ALTER TABLE benutzer_new RENAME TO benutzer;
+            PRAGMA foreign_keys=ON;
+        """)
+        db.commit()
+    else:
+        db.commit()
+
     # Seed default users if table is empty
     row = db.execute("SELECT COUNT(*) as c FROM benutzer").fetchone()
     if row["c"] == 0:
         users = [
+            ("Admin",        generate_password_hash("admin123"),    "admin"),
             ("Meister",      generate_password_hash("meister123"),  "meister"),
             ("Bereitschaft", generate_password_hash("bereit123"),   "bereitschaft"),
             ("TL",           generate_password_hash("tl123"),       "tl"),
@@ -121,6 +158,15 @@ def init_db():
             "INSERT INTO benutzer(name,passwort,rolle) VALUES(?,?,?)", users
         )
         db.commit()
+    else:
+        # Ensure an admin account exists
+        adm = db.execute("SELECT id FROM benutzer WHERE rolle='admin' LIMIT 1").fetchone()
+        if not adm:
+            db.execute(
+                "INSERT OR IGNORE INTO benutzer(name,passwort,rolle) VALUES(?,?,?)",
+                ("Admin", generate_password_hash("admin123"), "admin")
+            )
+            db.commit()
 
 def next_nummer():
     db = get_db()
@@ -176,8 +222,16 @@ def login():
         if user and check_password_hash(user["passwort"], pw):
             session.clear()
             session["user_id"] = user["id"]
-            session["name"]    = user["name"]
+            session["name"]    = user["anzeigename"] or user["name"]
+            session["username"] = user["name"]
             session["rolle"]   = user["rolle"]
+            db.execute(
+                "UPDATE benutzer SET letzter_login=? WHERE id=?",
+                (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), user["id"])
+            )
+            db.commit()
+            if user["rolle"] == "admin":
+                return redirect(url_for("admin_dashboard"))
             return redirect(url_for("index"))
         flash("Benutzername oder Passwort falsch.", "error")
     return render_template("login.html")
@@ -193,6 +247,8 @@ def logout():
 @login_required
 def index():
     rolle = session.get("rolle")
+    if rolle == "admin":
+        return redirect(url_for("admin_dashboard"))
     if rolle == "meister":
         return redirect(url_for("posteingang"))
     if rolle == "tl":
@@ -523,49 +579,193 @@ def export_csv():
         download_name=f"Stoerungen_{jahr}.csv"
     )
 
-# ── Routes: Admin (Meister) ───────────────────────────────────────────────────
+# ── Routes: Admin ─────────────────────────────────────────────────────────────
+
+ROLLE_LABELS = {
+    "admin":        "Administrator",
+    "meister":      "Meister",
+    "tl":           "Techn. Leitung",
+    "bereitschaft": "Bereitschaft",
+}
+app.jinja_env.globals["ROLLE_LABELS"] = ROLLE_LABELS
+
+@app.route("/admin")
+@role_required("admin")
+def admin_dashboard():
+    db = get_db()
+
+    # Kennzahlen
+    total_users   = db.execute("SELECT COUNT(*) FROM benutzer WHERE rolle != 'admin'").fetchone()[0]
+    active_users  = db.execute("SELECT COUNT(*) FROM benutzer WHERE aktiv=1 AND rolle != 'admin'").fetchone()[0]
+    total_stoer   = db.execute("SELECT COUNT(*) FROM stoerung").fetchone()[0]
+    pending       = db.execute("SELECT COUNT(*) FROM stoerung WHERE status='eingereicht'").fetchone()[0]
+    freigegeben   = db.execute("SELECT COUNT(*) FROM stoerung WHERE status='freigegeben'").fetchone()[0]
+
+    # Benutzer nach Rolle
+    by_rolle = db.execute("""
+        SELECT rolle, COUNT(*) AS c, SUM(aktiv) AS aktiv
+        FROM benutzer WHERE rolle != 'admin'
+        GROUP BY rolle ORDER BY rolle
+    """).fetchall()
+
+    # Letzte Aktivitäten (Freigabe-Log)
+    recent = db.execute("""
+        SELECT fl.aktion, fl.zeitstempel, fl.kommentar,
+               b.name AS von_name, s.nummer
+        FROM freigabe_log fl
+        JOIN benutzer b ON fl.von_user = b.id
+        JOIN stoerung s ON fl.stoerung_id = s.id
+        ORDER BY fl.zeitstempel DESC LIMIT 10
+    """).fetchall()
+
+    return render_template("admin_dashboard.html",
+        total_users=total_users, active_users=active_users,
+        total_stoer=total_stoer, pending=pending, freigegeben=freigegeben,
+        by_rolle=by_rolle, recent=recent,
+    )
 
 @app.route("/admin/benutzer")
-@role_required("meister")
+@role_required("admin", "meister")
 def admin_benutzer():
     db    = get_db()
-    users = db.execute("SELECT id,name,rolle,aktiv FROM benutzer ORDER BY rolle,name").fetchall()
-    return render_template("admin_benutzer.html", users=users)
+    rolle_filter = request.args.get("rolle", "")
+    query = """
+        SELECT b.id, b.name, b.anzeigename, b.rolle, b.aktiv, b.letzter_login,
+               COUNT(s.id) AS stoerungen
+        FROM benutzer b
+        LEFT JOIN stoerung s ON s.erstellt_von = b.id
+        WHERE b.rolle != 'admin'
+    """
+    params = []
+    if rolle_filter:
+        query += " AND b.rolle = ?"
+        params.append(rolle_filter)
+    query += " GROUP BY b.id ORDER BY b.rolle, b.name"
+    users = db.execute(query, params).fetchall()
+    return render_template("admin_benutzer.html", users=users, rolle_filter=rolle_filter)
 
 @app.route("/admin/benutzer/neu", methods=["POST"])
-@role_required("meister")
+@role_required("admin", "meister")
 def admin_benutzer_neu():
-    db   = get_db()
-    name = request.form["name"].strip()
-    pw   = request.form["passwort"]
-    roll = request.form["rolle"]
+    db          = get_db()
+    name        = request.form["name"].strip()
+    anzeigename = request.form.get("anzeigename", "").strip()
+    pw          = request.form["passwort"]
+    roll        = request.form["rolle"]
+
+    if session.get("rolle") == "meister" and roll in ("admin", "tl"):
+        flash("Meister dürfen keine TL- oder Admin-Konten anlegen.", "error")
+        return redirect(url_for("admin_benutzer"))
+
+    if len(pw) < 6:
+        flash("Passwort muss mindestens 6 Zeichen haben.", "error")
+        return redirect(url_for("admin_benutzer"))
+
     try:
         db.execute(
-            "INSERT INTO benutzer(name,passwort,rolle) VALUES(?,?,?)",
-            (name, generate_password_hash(pw), roll)
+            "INSERT INTO benutzer(name,anzeigename,passwort,rolle) VALUES(?,?,?,?)",
+            (name, anzeigename or None, generate_password_hash(pw), roll)
         )
         db.commit()
-        flash(f"Benutzer '{name}' angelegt.", "success")
+        flash(f"Benutzer '{anzeigename or name}' ({ROLLE_LABELS.get(roll, roll)}) angelegt.", "success")
     except sqlite3.IntegrityError:
         flash(f"Benutzername '{name}' existiert bereits.", "error")
     return redirect(url_for("admin_benutzer"))
 
-@app.route("/admin/benutzer/<int:uid>/passwort", methods=["POST"])
-@role_required("meister")
-def admin_passwort(uid):
-    db = get_db()
-    pw = request.form["passwort"]
-    db.execute("UPDATE benutzer SET passwort=? WHERE id=?", (generate_password_hash(pw), uid))
-    db.commit()
-    flash("Passwort geändert.", "success")
-    return redirect(url_for("admin_benutzer"))
+@app.route("/admin/benutzer/<int:uid>", methods=["GET", "POST"])
+@role_required("admin", "meister")
+def admin_benutzer_edit(uid):
+    db   = get_db()
+    user = db.execute("SELECT * FROM benutzer WHERE id=?", (uid,)).fetchone()
+    if not user:
+        abort(404)
+    if user["rolle"] == "admin" and session.get("rolle") != "admin":
+        abort(403)
+    if session.get("rolle") == "meister" and user["rolle"] in ("admin", "tl", "meister"):
+        abort(403)
+
+    if request.method == "POST":
+        aktion = request.form.get("aktion")
+        now    = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        if aktion == "speichern":
+            anzeigename = request.form.get("anzeigename", "").strip()
+            neue_rolle  = request.form.get("rolle")
+            if session.get("rolle") == "meister" and neue_rolle in ("admin", "tl", "meister"):
+                flash("Keine Berechtigung für diese Rollenzuweisung.", "error")
+            else:
+                db.execute(
+                    "UPDATE benutzer SET anzeigename=?, rolle=? WHERE id=?",
+                    (anzeigename or None, neue_rolle, uid)
+                )
+                db.commit()
+                flash("Benutzer aktualisiert.", "success")
+
+        elif aktion == "passwort":
+            pw  = request.form.get("passwort_neu", "")
+            pw2 = request.form.get("passwort_neu2", "")
+            if len(pw) < 6:
+                flash("Passwort muss mindestens 6 Zeichen haben.", "error")
+            elif pw != pw2:
+                flash("Passwörter stimmen nicht überein.", "error")
+            else:
+                db.execute("UPDATE benutzer SET passwort=? WHERE id=?",
+                           (generate_password_hash(pw), uid))
+                db.commit()
+                flash("Passwort geändert.", "success")
+
+        elif aktion == "toggle":
+            if uid == session.get("user_id"):
+                flash("Eigenes Konto kann nicht gesperrt werden.", "error")
+            else:
+                db.execute("UPDATE benutzer SET aktiv=1-aktiv WHERE id=?", (uid,))
+                db.commit()
+
+        elif aktion == "loeschen":
+            if uid == session.get("user_id"):
+                flash("Eigenes Konto kann nicht gelöscht werden.", "error")
+            else:
+                count = db.execute(
+                    "SELECT COUNT(*) FROM stoerung WHERE erstellt_von=?", (uid,)
+                ).fetchone()[0]
+                if count > 0:
+                    flash(f"Benutzer hat {count} Störungsmeldungen — Löschen nicht möglich. Stattdessen sperren.", "error")
+                else:
+                    db.execute("DELETE FROM benutzer WHERE id=?", (uid,))
+                    db.commit()
+                    flash("Benutzer gelöscht.", "success")
+                    return redirect(url_for("admin_benutzer"))
+
+        return redirect(url_for("admin_benutzer_edit", uid=uid))
+
+    stoer_count = db.execute(
+        "SELECT COUNT(*) FROM stoerung WHERE erstellt_von=?", (uid,)
+    ).fetchone()[0]
+    return render_template("admin_benutzer_edit.html", user=user, stoer_count=stoer_count)
 
 @app.route("/admin/benutzer/<int:uid>/toggle")
-@role_required("meister")
+@role_required("admin", "meister")
 def admin_toggle(uid):
     db = get_db()
-    db.execute("UPDATE benutzer SET aktiv = 1-aktiv WHERE id=?", (uid,))
-    db.commit()
+    if uid == session.get("user_id"):
+        flash("Eigenes Konto kann nicht gesperrt werden.", "error")
+    else:
+        db.execute("UPDATE benutzer SET aktiv=1-aktiv WHERE id=?", (uid,))
+        db.commit()
+    return redirect(url_for("admin_benutzer"))
+
+@app.route("/admin/benutzer/<int:uid>/passwort", methods=["POST"])
+@role_required("admin", "meister")
+def admin_passwort(uid):
+    db = get_db()
+    pw = request.form.get("passwort","")
+    if len(pw) < 6:
+        flash("Passwort muss mindestens 6 Zeichen haben.", "error")
+    else:
+        db.execute("UPDATE benutzer SET passwort=? WHERE id=?",
+                   (generate_password_hash(pw), uid))
+        db.commit()
+        flash("Passwort geändert.", "success")
     return redirect(url_for("admin_benutzer"))
 
 # ── Eigenes Passwort ändern ───────────────────────────────────────────────────
@@ -614,8 +814,10 @@ def datefmt(s):
 
 @app.context_processor
 def inject_pending():
-    count = 0
-    if session.get("rolle") in ("meister", "tl"):
+    count      = 0
+    user_count = 0
+    rolle      = session.get("rolle")
+    if rolle in ("meister", "tl", "admin"):
         try:
             db    = get_db()
             count = db.execute(
@@ -623,7 +825,15 @@ def inject_pending():
             ).fetchone()["c"]
         except Exception:
             pass
-    return {"pending_count": count}
+    if rolle == "admin":
+        try:
+            db         = get_db()
+            user_count = db.execute(
+                "SELECT COUNT(*) FROM benutzer WHERE aktiv=1 AND rolle != 'admin'"
+            ).fetchone()[0]
+        except Exception:
+            pass
+    return {"pending_count": count, "user_count": user_count}
 
 # ── Startup ───────────────────────────────────────────────────────────────────
 
